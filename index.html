@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <title>VaultPair</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #121214;
+      --surface-elevated: #1c1c1f;
+      --primary: #4f46e5;
+      --secondary: #8b5cf6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #ffffff;
+      --text-muted: #a1a1aa;
+      --border: #27272a;
+    }
+
+    * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    
+    body { background-color: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; overscroll-behavior-y: none; }
+    
+    /* SPLASH SCREEN (LAYAR LOADING PREMIUM) */
+    #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease, visibility 0.5s; }
+    .splash-logo { font-size: 36px; font-weight: 800; color: #fff; margin-bottom: 24px; letter-spacing: -1px; }
+    .loader { width: 44px; height: 44px; border: 4px solid rgba(79, 70, 229, 0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .header { padding: 24px 20px 12px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: var(--bg); z-index: 10; }
+    .brand-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .clock-badge { background: rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.3); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #818cf8; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
+    .clock-badge::before { content: ''; display: block; width: 6px; height: 6px; background: #818cf8; border-radius: 50%; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .content-area { flex: 1; overflow-y: auto; padding: 8px 20px 120px; scroll-behavior: smooth; }
+    .content-area::-webkit-scrollbar { display: none; }
+
+    .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeUp 0.3s ease-out forwards; }
+    .view-section.active { display: flex; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; }
+    .card-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+    .bank-card { background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); border: 1px solid rgba(79, 70, 229, 0.4); border-radius: 24px; padding: 28px 24px; position: relative; overflow: hidden; box-shadow: 0 16px 32px rgba(0,0,0,0.5); }
+    .bank-card::after { content: ''; position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%); }
+    .total-amount { font-size: 38px; font-weight: 800; margin-top: 4px; letter-spacing: -1px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .sub-card { background: var(--surface-elevated); border-radius: 20px; padding: 18px 16px; text-align: center; }
+    .sub-saldo { font-size: 18px; font-weight: 700; margin-top: 4px; }
+
+    .segment { display: flex; background: #000; border: 1px solid var(--border); border-radius: 16px; padding: 4px; margin-bottom: 20px; }
+    .segment-btn { flex: 1; text-align: center; padding: 12px; font-size: 13px; font-weight: 600; color: var(--text-muted); border-radius: 12px; transition: 0.25s; cursor: pointer; }
+    .segment-btn.active { background: var(--surface-elevated); color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+    .segment-btn.active.red { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .segment-btn.active.green { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+
+    .input-field { width: 100%; background: var(--surface-elevated); border: 1px solid transparent; color: #fff; padding: 16px; border-radius: 16px; font-size: 15px; font-weight: 600; outline: none; transition: 0.2s; margin-bottom: 16px; text-align: center; }
+    .input-field:focus { border-color: var(--primary); background: #27272a; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; cursor: pointer; width: 20px; height: 20px; }
+
+    .btn-action { background: var(--text); color: #000; font-weight: 800; font-size: 14px; padding: 16px; border-radius: 100px; border: none; width: 100%; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; cursor: pointer; transition: 0.2s; }
+    .btn-action:active { transform: scale(0.97); background: #e4e4e7; }
+
+    .history-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .history-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .h-left .h-title { font-size: 15px; font-weight: 700; }
+    .h-left .h-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .h-right { text-align: right; }
+    .h-right .h-amount { font-size: 16px; font-weight: 800; }
+    .h-right .h-date { font-size: 11px; color: #52525b; margin-top: 4px; }
+
+    .bottom-nav { position: fixed; bottom: 0; width: 100%; background: rgba(18, 18, 20, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); z-index: 100; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #52525b; font-size: 10px; font-weight: 700; transition: 0.3s; cursor: pointer; }
+    .nav-item svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-item.active { color: #fff; }
+
+    .toast { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--surface-elevated); color: #fff; padding: 14px 24px; border-radius: 50px; font-size: 13px; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 1000; transition: top 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); border: 1px solid var(--border); text-align: center; width: max-content; }
+    .toast.show { top: 50px; }
+    .toast.error { background: rgba(220, 38, 38, 0.95); border-color: var(--danger); }
+    .toast.success { background: rgba(16, 185, 129, 0.95); border-color: var(--success); }
+  </style>
+</head>
+<body>
+
+  <!-- LAYAR LOADING / SPLASH SCREEN -->
+  <div id="splash-screen">
+    <div class="splash-logo">VaultPair.</div>
+    <div class="loader"></div>
+  </div>
+
+  <!-- AREA TOAST NOTIFICATION -->
+  <div id="toast" class="toast">Notifikasi</div>
+
+  <header class="header">
+    <div class="brand-title">VaultPair.</div>
+    <div class="clock-badge" id="live-clock">00:00</div>
+  </header>
+
+  <main class="content-area" id="swipe-area">
+    
+    <div id="view-saldo" class="view-section active">
+      <div class="bank-card">
+        <div class="card-label" style="color: #cbd5e1;">Total Tabungan Bersama</div>
+        <div class="total-amount" id="total-saldo">Rp 0</div>
+      </div>
+      <div class="grid-2">
+        <div class="sub-card"><div class="card-label">Pengguna1</div><div class="sub-saldo" id="saldo-user1">Rp 0</div></div>
+        <div class="sub-card"><div class="card-label">Pengguna2</div><div class="sub-saldo" id="saldo-user2">Rp 0</div></div>
+      </div>
+    </div>
+
+    <div id="view-input" class="view-section">
+      <div class="card" style="padding: 24px 20px;">
+        
+        <div class="segment">
+          <div class="segment-btn active" id="btn-u1" onclick="pilihUser('user_1')">Pengguna1</div>
+          <div class="segment-btn" id="btn-u2" onclick="pilihUser('user_2')">Pengguna2</div>
+        </div>
+        <input type="hidden" id="select-user" value="user_1">
+
+        <div class="segment">
+          <div class="segment-btn active green" id="btn-t-masuk" onclick="pilihTipe('masuk')">Setor Dana</div>
+          <div class="segment-btn" id="btn-t-keluar" onclick="pilihTipe('keluar')">Tarik Dana</div>
+        </div>
+        <input type="hidden" id="select-tipe" value="masuk">
+
+        <div class="card-label" id="label-nominal">Nominal Setor</div>
+        <input type="tel" id="input-nominal-text" class="input-field" placeholder="Rp 0" autocomplete="off">
+
+        <div class="card-label">Tanggal Transaksi</div>
+        <input type="date" id="input-tanggal" class="input-field">
+        
+        <div class="card-label" style="margin-top: 4px;">Catatan Tambahan</div>
+        <input type="text" id="input-catatan" class="input-field" placeholder="Opsional..." style="text-align: left; padding: 14px 16px;">
+
+        <button class="btn-action" id="btn-submit" onclick="prosesTransaksi()">KIRIM TRANSAKSI</button>
+      </div>
+    </div>
+
+    <div id="view-riwayat" class="view-section">
+      <div class="card">
+        <div class="card-label">Mutasi Terakhir</div>
+        <div id="list-riwayat">
+          <div style="text-align: center; font-size: 13px; color: var(--text-muted); padding: 20px;">Memuat riwayat...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-saldo" onclick="switchView('saldo')">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      <span>BERANDA</span>
+    </div>
+    <div class="nav-item" id="nav-input" onclick="switchView('input')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+      <span>INPUT</span>
+    </div>
+    <div class="nav-item" id="nav-riwayat" onclick="switchView('riwayat')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+      <span>MUTASI</span>
+    </div>
+  </nav>
+
+  <script>
+    // ----------------------------------------------------
+    // LOGIKA PENGHILANGAN SPLASH SCREEN
+    // ----------------------------------------------------
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        splash.style.opacity = '0';
+        setTimeout(() => { splash.style.visibility = 'hidden'; }, 500); // Dihilangkan setelah animasi selesai
+      }, 1500); // Ditahan 1.5 detik biar ada kesan loading aplikasinya
+    });
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.className = 'toast show ' + type;
+      
+      if (navigator.vibrate) {
+        if (type === 'error') navigator.vibrate([50, 50, 50]);
+        else navigator.vibrate(50);
+      }
+      setTimeout(() => { toast.className = 'toast'; }, 3000);
+    }
+
+    const viewsMenu = ['saldo', 'input', 'riwayat'];
+    let currentIdx = 0;
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    const swipeArea = document.getElementById('swipe-area');
+    swipeArea.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    swipeArea.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, {passive: true});
+
+    function handleSwipe() {
+      const swipeTreshold = 50;
+      if (touchEndX < touchStartX - swipeTreshold) {
+        if (currentIdx < viewsMenu.length - 1) switchView(viewsMenu[++currentIdx]);
+      }
+      if (touchEndX > touchStartX + swipeTreshold) {
+        if (currentIdx > 0) switchView(viewsMenu[--currentIdx]);
+      }
+    }
+
+    function switchView(viewName) {
+      currentIdx = viewsMenu.indexOf(viewName);
+      if (navigator.vibrate) navigator.vibrate(30);
+      
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('view-' + viewName).classList.add('active');
+      document.getElementById('nav-' + viewName).classList.add('active');
+    }
+
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('live-clock').innerText = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    }, 1000);
+
+    function setDefaultDate() { document.getElementById('input-tanggal').value = new Date().toLocaleDateString('en-CA'); }
+    setDefaultDate();
+
+    function pilihUser(val) {
+      if (navigator.vibrate) navigator.vibrate(20);
+      document.getElementById('select-user').value = val;
+      document.getElementById('btn-u1').classList.remove('active');
+      document.getElementById('btn-u2').classList.remove('active');
+      document.getElementById(val === 'user_1' ? 'btn-u1' : 'btn-u2').classList.add('active');
+    }
+
+    function pilihTipe(val) {
+      if (navigator.vibrate) navigator.vibrate(20);
+      document.getElementById('select-tipe').value = val;
+      const bM = document.getElementById('btn-t-masuk');
+      const bK = document.getElementById('btn-t-keluar');
+      const inp = document.getElementById('input-nominal-text');
+      const lbl = document.getElementById('label-nominal');
+
+      bM.classList.remove('active', 'green');
+      bK.classList.remove('active', 'red');
+
+      if (val === 'masuk') {
+        bM.classList.add('active', 'green');
+        inp.style.color = '#ffffff';
+        lbl.innerText = 'Nominal Setor';
+      } else {
+        bK.classList.add('active', 'red');
+        inp.style.color = 'var(--danger)';
+        lbl.innerText = 'Nominal Tarik';
+      }
+    }
+
+    const inputNominalEl = document.getElementById('input-nominal-text');
+    inputNominalEl.addEventListener('input', function() {
+      let raw = this.value.replace(/[^0-9]/g, '');
+      this.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
+    });
+
+    // ----------------------------------------------------
+    // LOGIKA SUPABASE (JANGAN LUPA ISI URL & KEY)
+    // ----------------------------------------------------
+    const SUPABASE_URL = 'https://rmctwexaovyuveuogevv.supabase.co';
+    const SUPABASE_KEY = 'Sb_publishable_pU0AyNN4Xjc-Uwc2iUjC3g_GPiZD3yj';
+
+    
+    let db;
+    try {
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      initDatabase();
+    } catch (e) { console.warn("Supabase tidak aktif"); }
+
+    function initDatabase() {
+      fetchSaldo(); fetchRiwayat();
+      db.channel('db-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tabungan' }, () => fetchSaldo())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat' }, () => fetchRiwayat())
+        .subscribe();
+    }
+
+    async function fetchSaldo() {
+      try {
+        const { data } = await db.from('tabungan').select('*');
+        if (!data) return;
+        let u1 = 0, u2 = 0;
+        data.forEach(i => { if (i.user === 'user_1') u1 = i.saldo; if (i.user === 'user_2') u2 = i.saldo; });
+        document.getElementById('saldo-user1').innerText = formatRupiah(u1);
+        document.getElementById('saldo-user2').innerText = formatRupiah(u2);
+        document.getElementById('total-saldo').innerText = formatRupiah(u1 + u2);
+      } catch(e) {}
+    }
+
+    async function fetchRiwayat() {
+      try {
+        const { data } = await db.from('riwayat').select('*').order('created_at', { ascending: false }).limit(10);
+        const list = document.getElementById('list-riwayat');
+        list.innerHTML = '';
+        if (data && data.length > 0) {
+          data.forEach(i => {
+            const isPlus = i.tipe === 'masuk';
+            list.innerHTML += `
+              <div class="history-item">
+                <div class="h-left">
+                  <div class="h-title">${i.user === 'user_1' ? 'Pengguna1' : 'Pengguna2'}</div>
+                  <div class="h-desc">${i.catatan || (isPlus ? 'Setor Dana' : 'Tarik Dana')}</div>
+                </div>
+                <div class="h-right">
+                  <div class="h-amount" style="color: ${isPlus ? 'var(--success)' : 'var(--danger)'}">
+                    ${isPlus ? '+' : '-'} ${formatRupiah(i.nominal)}
+                  </div>
+                  <div class="h-date">${formatTanggal(i.created_at)}</div>
+                </div>
+              </div>`;
+          });
+        } else {
+          list.innerHTML = '<div style="text-align:center;font-size:13px;color:gray;padding:20px;">Belum ada mutasi.</div>';
+        }
+      } catch(e) {}
+    }
+
+    async function prosesTransaksi() {
+      if(!db) return showToast("Supabase belum diisi di kode!", "error");
+      
+      let rawNominal = inputNominalEl.value.replace(/\./g, '');
+      const nominal = parseInt(rawNominal);
+      if (!nominal || nominal <= 0) return showToast('Harap masukkan nominal uang!', 'error');
+
+      const btn = document.getElementById('btn-submit');
+      const user = document.getElementById('select-user').value;
+      const tipe = document.getElementById('select-tipe').value;
+      const tglInput = document.getElementById('input-tanggal').value;
+      const catatan = document.getElementById('input-catatan').value;
+
+      btn.disabled = true; btn.innerText = 'MEMPROSES...';
+
+      try {
+        const { data } = await db.from('tabungan').select('saldo').eq('user', user).single();
+        let currentSaldo = data ? data.saldo : 0;
+
+        if (tipe === 'masuk') { currentSaldo += nominal; } 
+        else {
+          if (currentSaldo < nominal) {
+            btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
+            return showToast('Saldo tidak cukup untuk ditarik!', 'error');
+          }
+          currentSaldo -= nominal;
+        }
+
+        const fullT = new Date(`${tglInput}T${new Date().toTimeString().split(' ')[0]}`).toISOString();
+        await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', user);
+        await db.from('riwayat').insert([{ user, tipe, nominal, catatan, created_at: fullT }]);
+
+        inputNominalEl.value = '';
+        document.getElementById('input-catatan').value = '';
+        pilihUser('user_1'); pilihTipe('masuk'); setDefaultDate();
+        
+        showToast('Transaksi berhasil!', 'success');
+        switchView('riwayat');
+        
+      } catch (e) { showToast("Terjadi kesalahan jaringan.", "error"); }
+      
+  btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
+
+    }
+
+    function formatRupiah(val) { return 'Rp ' + Number(val).toLocaleString('id-ID'); }
+    function formatTanggal(iso) {
+      if (!iso) return '-'; const d = new Date(iso);
+      return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' • ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' });
+    }
+  </script>
+</body>
+</html>
