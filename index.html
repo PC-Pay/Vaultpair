@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -297,10 +297,12 @@
 
     async function fetchRiwayat() {
       try {
-        const { data, error } = await db.from('riwayat').select('*').order('created_at', { ascending: false }).limit(10);
+        const { data, error } = await db.from('riwayat').select('*').limit(10);
         const list = document.getElementById('list-riwayat');
         list.innerHTML = '';
         if (data && data.length > 0) {
+          // Urutkan dari transaksi terbaru
+          data.sort((a, b) => b.id - a.id);
           data.forEach(i => {
             const isPlus = i.tipe === 'masuk';
             list.innerHTML += `
@@ -313,7 +315,7 @@
                   <div class="h-amount" style="color: ${isPlus ? 'var(--success)' : 'var(--danger)'}">
                     ${isPlus ? '+' : '-'} ${formatRupiah(i.nominal)}
                   </div>
-                  <div class="h-date">${formatTanggal(i.created_at)}</div>
+                  <div class="h-date">${formatTanggal(i.id)}</div>
                 </div>
               </div>`;
           });
@@ -338,8 +340,13 @@
       btn.disabled = true; btn.innerText = 'MEMPROSES...';
 
       try {
-        const { data, error: errFetch } = await db.from('tabungan').select('saldo').eq('user', user).single();
-        let currentSaldo = data ? data.saldo : 0;
+        // Cek saldo user saat ini (jika user_2 belum ada di Supabase, buatkan otomatis)
+        const { data, error: errFetch } = await db.from('tabungan').select('saldo').eq('user', user);
+        
+        let currentSaldo = 0;
+        if (data && data.length > 0) {
+          currentSaldo = data[0].saldo;
+        }
 
         if (tipe === 'masuk') { 
           currentSaldo += nominal; 
@@ -351,9 +358,10 @@
           currentSaldo -= nominal;
         }
 
-        const { error: errUpdate } = await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', user);
+        // Simpan / timpa data saldo di tabel tabungan
+        const { error: errUpdate } = await db.from('tabungan').upsert({ user: user, saldo: currentSaldo });
         
-        // DIBUATKAN ID UNIK OTOMATIS AGAR TIDAK DITOLAK SUPABASE
+        // Simpan riwayat hanya dengan 5 kolom yang kamu buat (id, user, tipe, nominal, catatan)
         const { error: errInsert } = await db.from('riwayat').insert([{ 
           id: Date.now(),
           user: user, 
@@ -381,11 +389,11 @@
     }
 
     function formatRupiah(val) { return 'Rp ' + Number(val).toLocaleString('id-ID'); }
-    function formatTanggal(iso) {
-      if (!iso) return '-'; const d = new Date(iso);
+    function formatTanggal(timestamp) {
+      if (!timestamp) return '-'; const d = new Date(Number(timestamp));
       return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' • ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' });
     }
   </script>
-</body>
-    </html>
+</body> 
+</html>
   
