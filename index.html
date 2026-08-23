@@ -29,7 +29,6 @@
     
     body { background-color: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; overscroll-behavior-y: none; }
     
-    /* SPLASH SCREEN (LAYAR LOADING PREMIUM) */
     #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease, visibility 0.5s; }
     .splash-logo { font-size: 36px; font-weight: 800; color: #fff; margin-bottom: 24px; letter-spacing: -1px; }
     .loader { width: 44px; height: 44px; border: 4px solid rgba(79, 70, 229, 0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
@@ -93,13 +92,11 @@
 </head>
 <body>
 
-  <!-- LAYAR LOADING / SPLASH SCREEN -->
   <div id="splash-screen">
     <div class="splash-logo">VaultPair.</div>
     <div class="loader"></div>
   </div>
 
-  <!-- AREA TOAST NOTIFICATION -->
   <div id="toast" class="toast">Notifikasi</div>
 
   <header class="header">
@@ -175,22 +172,18 @@
   </nav>
 
   <script>
-    // ----------------------------------------------------
-    // LOGIKA PENGHILANGAN SPLASH SCREEN
-    // ----------------------------------------------------
     window.addEventListener('load', () => {
       setTimeout(() => {
         const splash = document.getElementById('splash-screen');
         splash.style.opacity = '0';
-        setTimeout(() => { splash.style.visibility = 'hidden'; }, 500); // Dihilangkan setelah animasi selesai
-      }, 1500); // Ditahan 1.5 detik biar ada kesan loading aplikasinya
+        setTimeout(() => { splash.style.visibility = 'hidden'; }, 500);
+      }, 1500);
     });
 
     function showToast(msg, type = 'success') {
       const toast = document.getElementById('toast');
       toast.innerText = msg;
       toast.className = 'toast show ' + type;
-      
       if (navigator.vibrate) {
         if (type === 'error') navigator.vibrate([50, 50, 50]);
         else navigator.vibrate(50);
@@ -223,7 +216,6 @@
     function switchView(viewName) {
       currentIdx = viewsMenu.indexOf(viewName);
       if (navigator.vibrate) navigator.vibrate(30);
-      
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.getElementById('view-' + viewName).classList.add('active');
@@ -274,12 +266,9 @@
       this.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
     });
 
-    // ----------------------------------------------------
-    // LOGIKA SUPABASE (JANGAN LUPA ISI URL & KEY)
-    // ----------------------------------------------------
+    // SUPABASE CONFIG (SENSITIF HURUF KECIL 'sb_')
     const SUPABASE_URL = 'https://rmctwexaovyuveuogevv.supabase.co';
-    const SUPABASE_KEY = 'Sb_publishable_pU0AyNN4Xjc-Uwc2iUjC3g_GPiZD3yj';
-
+    const SUPABASE_KEY = 'sb_publishable_pU0AyNN4Xjc-Uwc2iUjC3g_GPiZD3yj';
     
     let db;
     try {
@@ -297,8 +286,8 @@
 
     async function fetchSaldo() {
       try {
-        const { data } = await db.from('tabungan').select('*');
-        if (!data) return;
+        const { data, error } = await db.from('tabungan').select('*');
+        if (error || !data) return;
         let u1 = 0, u2 = 0;
         data.forEach(i => { if (i.user === 'user_1') u1 = i.saldo; if (i.user === 'user_2') u2 = i.saldo; });
         document.getElementById('saldo-user1').innerText = formatRupiah(u1);
@@ -309,7 +298,7 @@
 
     async function fetchRiwayat() {
       try {
-        const { data } = await db.from('riwayat').select('*').order('created_at', { ascending: false }).limit(10);
+        const { data, error } = await db.from('riwayat').select('*').order('created_at', { ascending: false }).limit(10);
         const list = document.getElementById('list-riwayat');
         list.innerHTML = '';
         if (data && data.length > 0) {
@@ -345,17 +334,17 @@
       const btn = document.getElementById('btn-submit');
       const user = document.getElementById('select-user').value;
       const tipe = document.getElementById('select-tipe').value;
-      const tglInput = document.getElementById('input-tanggal').value;
       const catatan = document.getElementById('input-catatan').value;
 
       btn.disabled = true; btn.innerText = 'MEMPROSES...';
 
       try {
-        const { data } = await db.from('tabungan').select('saldo').eq('user', user).single();
+        const { data, error: errFetch } = await db.from('tabungan').select('saldo').eq('user', user).single();
         let currentSaldo = data ? data.saldo : 0;
 
-        if (tipe === 'masuk') { currentSaldo += nominal; } 
-        else {
+        if (tipe === 'masuk') { 
+          currentSaldo += nominal; 
+        } else {
           if (currentSaldo < nominal) {
             btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
             return showToast('Saldo tidak cukup untuk ditarik!', 'error');
@@ -363,21 +352,33 @@
           currentSaldo -= nominal;
         }
 
-        const fullT = new Date(`${tglInput}T${new Date().toTimeString().split(' ')[0]}`).toISOString();
-        await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', user);
-        await db.from('riwayat').insert([{ user, tipe, nominal, catatan, created_at: fullT }]);
-
-        inputNominalEl.value = '';
-        document.getElementById('input-catatan').value = '';
-        pilihUser('user_1'); pilihTipe('masuk'); setDefaultDate();
+        // Simpan saldo baru
+        const { error: errUpdate } = await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', user);
         
-        showToast('Transaksi berhasil!', 'success');
-        switchView('riwayat');
+        // Simpan mutasi riwayat
+        const { error: errInsert } = await db.from('riwayat').insert([{ 
+          user: user, 
+          tipe: tipe, 
+          nominal: nominal, 
+          catatan: catatan 
+        }]);
+
+        if (errUpdate || errInsert) {
+          showToast('Gagal menyimpan ke database!', 'error');
+        } else {
+          inputNominalEl.value = '';
+          document.getElementById('input-catatan').value = '';
+          pilihUser('user_1'); pilihTipe('masuk'); setDefaultDate();
+          
+          showToast('Transaksi berhasil!', 'success');
+          fetchSaldo();
+          fetchRiwayat();
+          switchView('riwayat');
+        }
         
       } catch (e) { showToast("Terjadi kesalahan jaringan.", "error"); }
       
-  btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
-
+      btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
     }
 
     function formatRupiah(val) { return 'Rp ' + Number(val).toLocaleString('id-ID'); }
