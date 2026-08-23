@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -124,13 +124,11 @@
           <div class="segment-btn active" id="btn-u1" onclick="pilihUser('user_1')">Pengguna1</div>
           <div class="segment-btn" id="btn-u2" onclick="pilihUser('user_2')">Pengguna2</div>
         </div>
-        <input type="hidden" id="select-user" value="user_1">
 
         <div class="segment">
           <div class="segment-btn active green" id="btn-t-masuk" onclick="pilihTipe('masuk')">Setor Dana</div>
           <div class="segment-btn" id="btn-t-keluar" onclick="pilihTipe('keluar')">Tarik Dana</div>
         </div>
-        <input type="hidden" id="select-tipe" value="masuk">
 
         <div class="card-label" id="label-nominal">Nominal Setor</div>
         <input type="tel" id="input-nominal-text" class="input-field" placeholder="Rp 0" autocomplete="off">
@@ -172,6 +170,9 @@
   </nav>
 
   <script>
+    let currentUser = 'user_1';
+    let currentTipe = 'masuk';
+
     window.addEventListener('load', () => {
       setTimeout(() => {
         const splash = document.getElementById('splash-screen');
@@ -193,25 +194,6 @@
 
     const viewsMenu = ['saldo', 'input', 'riwayat'];
     let currentIdx = 0;
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    const swipeArea = document.getElementById('swipe-area');
-    swipeArea.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
-    swipeArea.addEventListener('touchend', e => {
-      touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
-    }, {passive: true});
-
-    function handleSwipe() {
-      const swipeTreshold = 50;
-      if (touchEndX < touchStartX - swipeTreshold) {
-        if (currentIdx < viewsMenu.length - 1) switchView(viewsMenu[++currentIdx]);
-      }
-      if (touchEndX > touchStartX + swipeTreshold) {
-        if (currentIdx > 0) switchView(viewsMenu[--currentIdx]);
-      }
-    }
 
     function switchView(viewName) {
       currentIdx = viewsMenu.indexOf(viewName);
@@ -232,7 +214,7 @@
 
     function pilihUser(val) {
       if (navigator.vibrate) navigator.vibrate(20);
-      document.getElementById('select-user').value = val;
+      currentUser = val;
       document.getElementById('btn-u1').classList.remove('active');
       document.getElementById('btn-u2').classList.remove('active');
       document.getElementById(val === 'user_1' ? 'btn-u1' : 'btn-u2').classList.add('active');
@@ -240,7 +222,7 @@
 
     function pilihTipe(val) {
       if (navigator.vibrate) navigator.vibrate(20);
-      document.getElementById('select-tipe').value = val;
+      currentTipe = val;
       const bM = document.getElementById('btn-t-masuk');
       const bK = document.getElementById('btn-t-keluar');
       const inp = document.getElementById('input-nominal-text');
@@ -277,10 +259,6 @@
 
     function initDatabase() {
       fetchSaldo(); fetchRiwayat();
-      db.channel('db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tabungan' }, () => fetchSaldo())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'riwayat' }, () => fetchRiwayat())
-        .subscribe();
     }
 
     async function fetchSaldo() {
@@ -288,7 +266,10 @@
         const { data, error } = await db.from('tabungan').select('*');
         if (error || !data) return;
         let u1 = 0, u2 = 0;
-        data.forEach(i => { if (i.user === 'user_1') u1 = i.saldo; if (i.user === 'user_2') u2 = i.saldo; });
+        data.forEach(i => { 
+          if (i.user === 'user_1') u1 = i.saldo; 
+          if (i.user === 'user_2') u2 = i.saldo; 
+        });
         document.getElementById('saldo-user1').innerText = formatRupiah(u1);
         document.getElementById('saldo-user2').innerText = formatRupiah(u2);
         document.getElementById('total-saldo').innerText = formatRupiah(u1 + u2);
@@ -297,12 +278,11 @@
 
     async function fetchRiwayat() {
       try {
-        const { data, error } = await db.from('riwayat').select('*').limit(10);
+        const { data, error } = await db.from('riwayat').select('*');
         const list = document.getElementById('list-riwayat');
         list.innerHTML = '';
         if (data && data.length > 0) {
-          // Urutkan dari transaksi terbaru
-          data.sort((a, b) => b.id - a.id);
+          data.sort((a, b) => Number(b.id) - Number(a.id));
           data.forEach(i => {
             const isPlus = i.tipe === 'masuk';
             list.innerHTML += `
@@ -326,29 +306,22 @@
     }
 
     async function prosesTransaksi() {
-      if(!db) return showToast("Supabase belum diisi di kode!", "error");
+      if(!db) return showToast("Database tidak terhubung!", "error");
       
       let rawNominal = inputNominalEl.value.replace(/\./g, '');
       const nominal = parseInt(rawNominal);
       if (!nominal || nominal <= 0) return showToast('Harap masukkan nominal uang!', 'error');
 
       const btn = document.getElementById('btn-submit');
-      const user = document.getElementById('select-user').value;
-      const tipe = document.getElementById('select-tipe').value;
       const catatan = document.getElementById('input-catatan').value;
 
       btn.disabled = true; btn.innerText = 'MEMPROSES...';
 
       try {
-        // Cek saldo user saat ini (jika user_2 belum ada di Supabase, buatkan otomatis)
-        const { data, error: errFetch } = await db.from('tabungan').select('saldo').eq('user', user);
-        
-        let currentSaldo = 0;
-        if (data && data.length > 0) {
-          currentSaldo = data[0].saldo;
-        }
+        const { data } = await db.from('tabungan').select('saldo').eq('user', currentUser);
+        let currentSaldo = (data && data.length > 0) ? data[0].saldo : 0;
 
-        if (tipe === 'masuk') { 
+        if (currentTipe === 'masuk') { 
           currentSaldo += nominal; 
         } else {
           if (currentSaldo < nominal) {
@@ -358,32 +331,37 @@
           currentSaldo -= nominal;
         }
 
-        // Simpan / timpa data saldo di tabel tabungan
-        const { error: errUpdate } = await db.from('tabungan').upsert({ user: user, saldo: currentSaldo });
+        // 1. Simpan/Update Saldo
+        let { error: errUpdate } = await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', currentUser);
         
-        // Simpan riwayat hanya dengan 5 kolom yang kamu buat (id, user, tipe, nominal, catatan)
-        const { error: errInsert } = await db.from('riwayat').insert([{ 
+        // Jika baris user belum ada, insert baru
+        if (errUpdate || !data || data.length === 0) {
+          await db.from('tabungan').insert([{ user: currentUser, saldo: currentSaldo }]);
+        }
+
+        // 2. Simpan Mutasi Riwayat
+        await db.from('riwayat').insert([{ 
           id: Date.now(),
-          user: user, 
-          tipe: tipe, 
+          user: currentUser, 
+          tipe: currentTipe, 
           nominal: nominal, 
           catatan: catatan 
         }]);
 
-        if (errUpdate || errInsert) {
-          showToast('Gagal menyimpan ke database!', 'error');
-        } else {
-          inputNominalEl.value = '';
-          document.getElementById('input-catatan').value = '';
-          pilihUser('user_1'); pilihTipe('masuk'); setDefaultDate();
-          
-          showToast('Transaksi berhasil!', 'success');
-          fetchSaldo();
-          fetchRiwayat();
-          switchView('riwayat');
-        }
+        inputNominalEl.value = '';
+        document.getElementById('input-catatan').value = '';
+        pilihUser('user_1'); 
+        pilihTipe('masuk'); 
+        setDefaultDate();
         
-      } catch (e) { showToast("Terjadi kesalahan jaringan.", "error"); }
+        showToast('Transaksi berhasil!', 'success');
+        await fetchSaldo();
+        await fetchRiwayat();
+        switchView('riwayat');
+
+      } catch (e) { 
+        showToast("Gagal menyimpan ke database!", "error"); 
+      }
       
       btn.disabled = false; btn.innerText = 'KIRIM TRANSAKSI';
     }
@@ -394,6 +372,5 @@
       return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' • ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute:'2-digit' });
     }
   </script>
-</body> 
+</body>
 </html>
-  
