@@ -192,8 +192,30 @@
       setTimeout(() => { toast.className = 'toast'; }, 3000);
     }
 
+    // ----------------------------------------------------
+    // FITUR SWIPE / USAP LAYAR (DIKEMBALIKAN 100%)
+    // ----------------------------------------------------
     const viewsMenu = ['saldo', 'input', 'riwayat'];
     let currentIdx = 0;
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    const swipeArea = document.getElementById('swipe-area');
+    swipeArea.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    swipeArea.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, {passive: true});
+
+    function handleSwipe() {
+      const swipeTreshold = 50;
+      if (touchEndX < touchStartX - swipeTreshold) {
+        if (currentIdx < viewsMenu.length - 1) switchView(viewsMenu[++currentIdx]);
+      }
+      if (touchEndX > touchStartX + swipeTreshold) {
+        if (currentIdx > 0) switchView(viewsMenu[--currentIdx]);
+      }
+    }
 
     function switchView(viewName) {
       currentIdx = viewsMenu.indexOf(viewName);
@@ -334,7 +356,6 @@
         // 1. Simpan/Update Saldo
         let { error: errUpdate } = await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', currentUser);
         
-        // Jika baris user belum ada, insert baru
         if (errUpdate || !data || data.length === 0) {
           await db.from('tabungan').insert([{ user: currentUser, saldo: currentSaldo }]);
         }
