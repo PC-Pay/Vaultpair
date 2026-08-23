@@ -266,7 +266,6 @@
       this.value = raw ? parseInt(raw, 10).toLocaleString('id-ID') : '';
     });
 
-    // SUPABASE CONFIG (SENSITIF HURUF KECIL 'sb_')
     const SUPABASE_URL = 'https://rmctwexaovyuveuogevv.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_pU0AyNN4Xjc-Uwc2iUjC3g_GPiZD3yj';
     
@@ -352,11 +351,11 @@
           currentSaldo -= nominal;
         }
 
-        // Simpan saldo baru
         const { error: errUpdate } = await db.from('tabungan').update({ saldo: currentSaldo }).eq('user', user);
         
-        // Simpan mutasi riwayat
+        // DIBUATKAN ID UNIK OTOMATIS AGAR TIDAK DITOLAK SUPABASE
         const { error: errInsert } = await db.from('riwayat').insert([{ 
+          id: Date.now(),
           user: user, 
           tipe: tipe, 
           nominal: nominal, 
@@ -388,5 +387,5 @@
     }
   </script>
 </body>
-      </html>
-      
+    </html>
+  
