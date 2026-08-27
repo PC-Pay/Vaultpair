@@ -54,7 +54,7 @@ async function loadKeamananServer() {
   try {
     const res = await db.from('pengaturan').select('*').eq('id', 'config').single();
     if (res.data) {
-      pinCode = res.data.pin_code || '1234';
+      pinCode = res.data.pin_code || '2122';
       isPinActive = res.data.is_pin_active !== false;
     }
   } catch(e) {}
