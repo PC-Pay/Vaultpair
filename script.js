@@ -10,7 +10,7 @@ let nameUser2 = localStorage.getItem('vp_name_u2') || 'Pengguna 2';
 let isLightTheme = localStorage.getItem('vp_theme_light') === 'true';
 let isVibrateActive = localStorage.getItem('vp_vibrate_active') !== 'false';
 
-// PIN diambil dari Cloud Supabase
+// PIN diambil dari Cloud Supabase (Masing-masing User Punya PIN Sendiri)
 let pinCode = '1234';
 let isPinActive = false;
 
@@ -58,11 +58,11 @@ async function loadKeamananServer() {
     const res = await db.from('pengaturan').select('*').eq('id', 'config').single();
     if (res.data) {
       if (MY_DEVICE_ROLE === 'user_1') {
-        pinCode = res.data.pin_u1 || '1234';
-        isPinActive = Boolean(res.data.is_pin_active_u1);
+        pinCode = String(res.data.pin_u1 || '1234');
+        isPinActive = res.data.is_pin_active_u1 === true || res.data.is_pin_active_u1 === 'true';
       } else {
-        pinCode = res.data.pin_u2 || '1234';
-        isPinActive = Boolean(res.data.is_pin_active_u2);
+        pinCode = String(res.data.pin_u2 || '1234');
+        isPinActive = res.data.is_pin_active_u2 === true || res.data.is_pin_active_u2 === 'true';
       }
     }
   } catch(e) {
@@ -180,7 +180,9 @@ function tutupModalSecurity() {
 
 async function toggleFiturPin() {
   const checkboxEl = document.getElementById('toggle-pin');
-  isPinActive = checkboxEl ? checkboxEl.checked : false;
+  if (!checkboxEl) return;
+  
+  isPinActive = checkboxEl.checked;
 
   let updatePayload = {};
   if (MY_DEVICE_ROLE === 'user_1') {
@@ -189,9 +191,13 @@ async function toggleFiturPin() {
     updatePayload = { is_pin_active_u2: isPinActive };
   }
 
-  await db.from('pengaturan').update(updatePayload).eq('id', 'config');
-  applyPinUI();
-  showToast(isPinActive ? 'PIN diaktifkan' : 'PIN dinonaktifkan', 'success');
+  try {
+    await db.from('pengaturan').update(updatePayload).eq('id', 'config');
+    applyPinUI();
+    showToast(isPinActive ? 'PIN diaktifkan' : 'PIN dinonaktifkan', 'success');
+  } catch(e) {
+    showToast('Gagal mengupdate PIN ke server!', 'error');
+  }
 }
 
 function bukaModalPin() {
@@ -681,4 +687,4 @@ window.tutupModalEditTx = tutupModalEditTx;
 window.bukaModalEditTx = bukaModalEditTx;
 window.hapusTransaksiDirect = hapusTransaksiDirect;
 window.prosesTransaksi = prosesTransaksi;
-                                                       
+    
