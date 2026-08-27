@@ -7,9 +7,9 @@ let nameUser2 = localStorage.getItem('vp_name_u2') || 'Pengguna 2';
 let isLightTheme = localStorage.getItem('vp_theme_light') === 'true';
 let isVibrateActive = localStorage.getItem('vp_vibrate_active') !== 'false';
 
-// PIN diambil dari Cloud Supabase
+// Default PIN aktif di awal agar tidak bocor saat loading cache/network
 let pinCode = '1234';
-let isPinActive = false;
+let isPinActive = true;
 
 let selectedTxId = null;
 let riwayatDataCache = [];
@@ -24,10 +24,16 @@ try {
   db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 } catch (e) { console.warn("Supabase tidak aktif"); }
 
-window.addEventListener('load', function() {
+window.addEventListener('load', async function() {
   updateTampilanNama();
   applyPreferencesUI();
-  if (db) initDatabase();
+  
+  if (db) {
+    await loadKeamananServer();
+    initDatabase();
+  } else {
+    applyPinUI();
+  }
 
   setTimeout(function() {
     const splash = document.getElementById('splash-screen');
@@ -35,7 +41,7 @@ window.addEventListener('load', function() {
       splash.style.opacity = '0';
       setTimeout(function() { splash.style.visibility = 'hidden'; }, 500);
     }
-  }, 1500);
+  }, 1200);
 });
 
 function triggerVibration(duration = 20) {
@@ -49,7 +55,7 @@ async function loadKeamananServer() {
     const res = await db.from('pengaturan').select('*').eq('id', 'config').single();
     if (res.data) {
       pinCode = res.data.pin_code || '1234';
-      isPinActive = res.data.is_pin_active || false;
+      isPinActive = res.data.is_pin_active !== false;
     }
   } catch(e) {}
 
@@ -349,7 +355,6 @@ if (editTxNominalEl) {
 }
 
 function initDatabase() {
-  loadKeamananServer();
   fetchSaldo(); 
   fetchRiwayat();
 }
