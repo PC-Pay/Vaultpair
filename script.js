@@ -10,7 +10,7 @@ let nameUser2 = localStorage.getItem('vp_name_u2') || 'Pengguna 2';
 let isLightTheme = localStorage.getItem('vp_theme_light') === 'true';
 let isVibrateActive = localStorage.getItem('vp_vibrate_active') !== 'false';
 
-// PIN diambil dari Cloud Supabase (Setiap User Punya PIN Sendiri)
+// PIN diambil dari Cloud Supabase
 let pinCode = '1234';
 let isPinActive = false;
 
@@ -59,13 +59,15 @@ async function loadKeamananServer() {
     if (res.data) {
       if (MY_DEVICE_ROLE === 'user_1') {
         pinCode = res.data.pin_u1 || '1234';
-        isPinActive = res.data.is_pin_active_u1 || false;
+        isPinActive = Boolean(res.data.is_pin_active_u1);
       } else {
         pinCode = res.data.pin_u2 || '1234';
-        isPinActive = res.data.is_pin_active_u2 || false;
+        isPinActive = Boolean(res.data.is_pin_active_u2);
       }
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn("Gagal memuat pengaturan keamanan server");
+  }
 
   applyPinUI();
 }
@@ -83,7 +85,9 @@ function applyPreferencesUI() {
 
 function applyPinUI() {
   const toggleEl = document.getElementById('toggle-pin');
-  if (toggleEl) toggleEl.checked = isPinActive;
+  if (toggleEl) {
+    toggleEl.checked = isPinActive;
+  }
   
   const lockEl = document.getElementById('lock-screen');
   if (lockEl) {
@@ -677,3 +681,4 @@ window.tutupModalEditTx = tutupModalEditTx;
 window.bukaModalEditTx = bukaModalEditTx;
 window.hapusTransaksiDirect = hapusTransaksiDirect;
 window.prosesTransaksi = prosesTransaksi;
+                                                       
